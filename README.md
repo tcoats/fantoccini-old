@@ -1,4 +1,1 @@
 # Fantoccini
-
-- Stack
-- Variables
