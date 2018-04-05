@@ -5,7 +5,6 @@
 #include <iostream>
 
 #include "../fantoccini.h"
-#include "../input.h"
 
 using namespace glm;
 using namespace std;
@@ -18,7 +17,7 @@ namespace GLFW {
   long _joysticks[GLFW_JOYSTICK_LAST + 1];
 
   void Bind() {
-    Bus::On(Message::OnEventDelta, +[](long id, double dt) {
+    Bus::On(Event::OnEventDelta, +[](long id, double dt) {
       glfwPollEvents();
       if (GLFW_PRESS == glfwGetKey(_window, GLFW_KEY_ESCAPE)) {
         Bus::Emit(Procedure::Quit, 0, nullptr);
@@ -29,17 +28,17 @@ namespace GLFW {
           if (_joysticks[i] != 0) continue;
           auto id = ECS::NewID();
           _joysticks[i] = id;
-          Bus::Emit(Message::OnJoystickConnected, id, nullptr);
+          Bus::Emit(Event::OnJoystickConnected, id, nullptr);
         }
         else {
           if (_joysticks[i] == 0) continue;
-          Bus::Emit(Message::OnJoystickDisconnected, _joysticks[i], nullptr);
+          Bus::Emit(Event::OnJoystickDisconnected, _joysticks[i], nullptr);
           _joysticks[i] = 0;
         }
       }
     });
 
-    Bus::On(Message::OnQuit, +[](long id, void* m) {
+    Bus::On(Event::OnQuit, +[](long id, void* m) {
       glfwTerminate();
     });
 
@@ -59,31 +58,31 @@ namespace GLFW {
     });
 
     Bus::On(Procedure::Init, +[](long id, void* m) -> void* {
-      Bus::Emit(Message::OnInit, 0, m);
-      Bus::Emit(Message::OnLoad, 0, m);
-      Bus::Emit(Message::OnStart, 0, m);
+      Bus::Emit(Event::OnInit, 0, m);
+      Bus::Emit(Event::OnLoad, 0, m);
+      Bus::Emit(Event::OnStart, 0, m);
       double lastFrame = 0.0f;
       while (!glfwWindowShouldClose(_window)) {
         auto currentFrame = glfwGetTime();
         auto delta = currentFrame - lastFrame;
         lastFrame = currentFrame;
-        Bus::Emit(Message::OnEventDelta, 0, delta);
-        Bus::Emit(Message::OnPhysicsDelta, 0, delta);
+        Bus::Emit(Event::OnEventDelta, 0, delta);
+        Bus::Emit(Event::OnPhysicsDelta, 0, delta);
         glViewport(0, 0, _targetresolution.x, _targetresolution.y);
-        Bus::Emit(Message::OnDisplayDelta, 0, delta);
+        Bus::Emit(Event::OnDisplayDelta, 0, delta);
         glfwSwapBuffers(_window);
       }
-      Bus::Emit(Message::OnQuit, 0, nullptr);
+      Bus::Emit(Event::OnQuit, 0, nullptr);
       return nullptr;
     });
 
-    Bus::On(Message::OnInit, +[](long id, void* m) {
+    Bus::On(Event::OnInit, +[](long id, void* m) {
       glfwSetErrorCallback(+[](int error, const char* description) {
-        Bus::Emit(Message::OnError, 0, description);
+        Bus::Emit(Event::OnError, 0, description);
       });
       if (!glfwInit())
       {
-        Bus::Emit(Message::OnError, 0, "glfwInit");
+        Bus::Emit(Event::OnError, 0, "glfwInit");
         Bus::Emit(Procedure::Quit, 0, nullptr);
       }
 
@@ -98,7 +97,7 @@ namespace GLFW {
       window = _window;
       if (!_window)
       {
-        Bus::Emit(Message::OnError, 0, "glfwCreateWindow");
+        Bus::Emit(Event::OnError, 0, "glfwCreateWindow");
         Bus::Emit(Procedure::Quit, 0, nullptr);
         glfwTerminate();
         return;
@@ -117,7 +116,7 @@ namespace GLFW {
 
       glewExperimental = GL_TRUE;
       if (glewInit() != GLEW_OK) {
-        Bus::Emit(Message::OnError, 0, "glewInit");
+        Bus::Emit(Event::OnError, 0, "glewInit");
         Bus::Emit(Procedure::Quit, 0, nullptr);
         glfwTerminate();
         return;
@@ -132,7 +131,7 @@ namespace GLFW {
         e.scancode = scancode;
         e.action = action;
         e.mods = mods;
-        Bus::Emit(Message::OnKeyboard, 0, &e);
+        Bus::Emit(Event::OnKeyboard, 0, &e);
       });
       glfwSetMouseButtonCallback(_window,
         +[](GLFWwindow* window, int button, int action, int mods) {
@@ -140,17 +139,17 @@ namespace GLFW {
         e.button = button;
         e.action = action;
         e.mods = mods;
-        Bus::Emit(Message::OnMouseButton, 0, &e);
+        Bus::Emit(Event::OnMouseButton, 0, &e);
       });
       glfwSetCursorPosCallback(_window,
         +[](GLFWwindow* window, double xpos, double ypos) {
         vec2 e(xpos, ypos);
-        Bus::Emit(Message::OnCursorPos, 0, &e);
+        Bus::Emit(Event::OnCursorPos, 0, &e);
       });
       glfwSetScrollCallback(_window,
         +[](GLFWwindow* window, double xoffset, double yoffset) {
         vec2 e(xoffset, yoffset);
-        Bus::Emit(Message::OnScroll, 0, &e);
+        Bus::Emit(Event::OnScroll, 0, &e);
       });
     });
   }

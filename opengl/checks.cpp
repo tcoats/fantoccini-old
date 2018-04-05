@@ -6,7 +6,8 @@
 
 using namespace std;
 
-namespace OpenGLChecks {
+namespace OpenGL {
+namespace Checks {
   void Bind() {
     Bus::On(Procedure::PrintOpenGLParams, +[](long id, void* m) -> void* {
       cout << "{\n";
@@ -89,4 +90,5 @@ namespace OpenGLChecks {
       return (void*)true;
     });
   }
+}
 }

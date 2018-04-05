@@ -16,20 +16,20 @@ namespace PhysFS {
   map<long, char*> files;
 
   void Bind() {
-    Bus::On(Message::OnQuit, +[](long id, void* m) {
+    Bus::On(Event::OnQuit, +[](long id, void* m) {
       for (auto& kv : files)
         delete kv.second;
       files.clear();
       PHYSFS_deinit();
     });
-    Bus::On(Message::OnEntityDeleted, +[](long id, void* m) {
+    Bus::On(Event::OnEntityDeleted, +[](long id, void* m) {
       if (files.find(id) != files.end()) {
         delete[] files[id];
         files.erase(id);
       }
     });
 
-    Bus::On(Message::OnInit, +[](long id, vector<string>* arguments) {
+    Bus::On(Event::OnInit, +[](long id, vector<string>* arguments) {
       PHYSFS_init((*arguments)[0].c_str());
       auto dataDirectory = State::GetDataDirectory();
       PHYSFS_setWriteDir(dataDirectory.c_str());
@@ -66,8 +66,6 @@ namespace PhysFS {
       file = nullptr;
       files.insert(pair<long, char*>(id, content));
       cout << path << ": " << size << " bytes\n";
-      //cout << content << endl;
-      Bus::Emit(Message::OnTextLoaded, id, content);
       return content;
     });
   }

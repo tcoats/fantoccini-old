@@ -34,7 +34,7 @@ namespace PhysFS {
       if (mode & ios_base::out) setp(buffer, buffer);
       auto res = PHYSFS_tell(file);
       if (res == -1)
-        Bus::Emit(Message::OnError, 0,
+        Bus::Emit(Event::OnError, 0,
           PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode()));
       return res;
     }
@@ -45,7 +45,7 @@ namespace PhysFS {
       if (mode & ios_base::out) setp(buffer, buffer);
       auto res = PHYSFS_tell(file);
       if (res == -1)
-        Bus::Emit(Message::OnError, 0,
+        Bus::Emit(Event::OnError, 0,
           PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode()));
       return res;
     }
@@ -86,7 +86,7 @@ namespace PhysFS {
   basefstream::basefstream(PHYSFS_File* file)
     : file(file) {
     if (file == NULL) {
-      Bus::Emit(Message::OnError, 0, "PhysFS file not found");
+      Bus::Emit(Event::OnError, 0, "PhysFS file not found");
       throw invalid_argument("attempted to construct fstream with NULL ptr");
     }
   }

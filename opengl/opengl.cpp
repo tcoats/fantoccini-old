@@ -13,11 +13,11 @@ using namespace std;
 using namespace glm;
 
 namespace OpenGL {
-  auto cameraProjection = perspective(45.0f, 16.0f / 9.0f, 0.1f, 100.f);
   auto cameraPosition = vec3(0.0f, 0.0f, 5.0f);
-  auto cameraTarget = vec3(0.0f, 0.0f, 0.0f);
-  auto cameraUp = vec3(0.0f, 1.0f, 0.0f);
-  auto cameraTransform = lookAt(cameraPosition, cameraTarget, cameraUp);
+  auto cameraOrientation = quat(vec3(0.0f, 1.0f * pi<float>(), 0.0f));
+
+  auto cameraProjection = perspective(45.0f, 16.0f / 9.0f, 0.1f, 100.f);
+  auto cameraTransform = mat4_cast(cameraOrientation) * translate(mat4(1.0f), cameraPosition);
   auto worldTransform = cameraProjection * cameraTransform;
 
   auto lightDirection = normalize(vec3(-0.5f, 1.0f, 0.25f));
@@ -41,7 +41,7 @@ namespace OpenGL {
   unsigned int indiciesId;
   unsigned int instancesId;
   unsigned int frameBufferId;
-  unsigned int depthTextureId;
+  unsigned int shadowTextureId;
   unsigned int quadVertexArrayId;
   unsigned int quadVerticiesId;
 
@@ -59,14 +59,14 @@ namespace OpenGL {
   };
   modelShaderRef modelShader;
 
-  struct depthShaderRef {
+  struct shadowShaderRef {
     unsigned int id;
 
     int worldDepthTransform;
     int position;
     int modelTransform;
   };
-  depthShaderRef depthShader;
+  shadowShaderRef shadowShader;
 
   struct quadShaderRef {
     unsigned int id;
@@ -223,13 +223,13 @@ namespace OpenGL {
     glDetachShader(result, vertId);
     glDeleteShader(fragId);
     glDeleteShader(vertId);
-    Bus::Emit(Procedure::DeleteEntity, vertSourceId, nullptr);
-    Bus::Emit(Procedure::DeleteEntity, fragSourceId, nullptr);
+    ECS::Delete(vertSourceId);
+    ECS::Delete(fragSourceId);
     return result;
   }
 
   void Bind() {
-    Bus::On(Message::OnLoad, +[](long id, void* m) {
+    Bus::On(Event::OnLoad, +[](long id, void* m) {
       glEnable(GL_DEPTH_TEST);
       glDepthFunc(GL_LESS);
       glEnable(GL_CULL_FACE);
@@ -245,12 +245,12 @@ namespace OpenGL {
       cout << "  \"Instances Count\": " << instances_count << "\n";
       cout << "}\n";
 
-      depthShader.id = LoadProgram("depth");
-      depthShader.worldDepthTransform =
-        glGetUniformLocation(depthShader.id, "worldDepthTransform");
-      depthShader.modelTransform =
-        glGetAttribLocation(depthShader.id, "modelTransform");
-      depthShader.position = glGetAttribLocation(depthShader.id, "position");
+      shadowShader.id = LoadProgram("shadow");
+      shadowShader.worldDepthTransform =
+        glGetUniformLocation(shadowShader.id, "worldDepthTransform");
+      shadowShader.modelTransform =
+        glGetAttribLocation(shadowShader.id, "modelTransform");
+      shadowShader.position = glGetAttribLocation(shadowShader.id, "position");
 
       modelShader.id = LoadProgram("flat");
       modelShader.worldTransform =
@@ -273,11 +273,11 @@ namespace OpenGL {
       quadShader.position = glGetAttribLocation(quadShader.id, "position");
 
       cout << "{\n";
-      cout << "  \"Depth\": {\n";
-      cout << "    \"id\": " << depthShader.id << ",\n";
-      cout << "    \"worldDepthTransform\": " << depthShader.worldDepthTransform << ",\n";
-      cout << "    \"modelTransform\": " << depthShader.modelTransform << ",\n";
-      cout << "    \"position\": " << depthShader.position << "\n";
+      cout << "  \"Shadow\": {\n";
+      cout << "    \"id\": " << shadowShader.id << ",\n";
+      cout << "    \"worldDepthTransform\": " << shadowShader.worldDepthTransform << ",\n";
+      cout << "    \"modelTransform\": " << shadowShader.modelTransform << ",\n";
+      cout << "    \"position\": " << shadowShader.position << "\n";
       cout << "  },\n  {\n";
       cout << "  \"Flat\": {\n";
       cout << "    \"id\": " << modelShader.id << ",\n";
@@ -320,8 +320,8 @@ namespace OpenGL {
       glBufferData(GL_ARRAY_BUFFER,
         sizeof(instances), instances, GL_STREAM_DRAW);
 
-      glGenTextures(1, &depthTextureId);
-      glBindTexture(GL_TEXTURE_2D, depthTextureId);
+      glGenTextures(1, &shadowTextureId);
+      glBindTexture(GL_TEXTURE_2D, shadowTextureId);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
       glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -336,7 +336,7 @@ namespace OpenGL {
       glBindFramebuffer(GL_FRAMEBUFFER, frameBufferId);
       glDrawBuffer(GL_NONE);
       glReadBuffer(GL_NONE);
-      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTextureId, 0);
+      glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, shadowTextureId, 0);
 
       if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
         Bus::Emit(Procedure::Quit, 0, nullptr);
@@ -344,44 +344,44 @@ namespace OpenGL {
       glBindFramebuffer(GL_FRAMEBUFFER, 0);
     });
 
-    Bus::On(Message::OnPhysicsDelta, +[](long id, double dt) {
+    Bus::On(Event::OnPhysicsDelta, +[](long id, double dt) {
       instances[0].modelTransform = rotate(
         instances[0].modelTransform, (float)(dt), vec3(1.0f, 0.0f, 0.0f));
       glBindBuffer(GL_ARRAY_BUFFER, instancesId);
       glBufferData(GL_ARRAY_BUFFER, sizeof(instances), nullptr, GL_STREAM_DRAW);
       glBufferData(GL_ARRAY_BUFFER, sizeof(instances), instances, GL_STREAM_DRAW);
 
-      cameraTransform =
-        rotate(cameraTransform, (float)(dt / 3), vec3(1.0f, 1.0f, 1.0f));
-      worldTransform = cameraProjection * cameraTransform;
+      // cameraTransform = mat4_cast((float)(dt * 5.0f) * angleAxis(radians(90.f), normalize(vec3(0.0f, 1.0f, 1.0f)))) * cameraTransform;
+      // worldTransform = cameraProjection * cameraTransform;
     });
 
-    Bus::On(Message::OnDisplayDelta, +[](long id, double dt) {
+    Bus::On(Event::OnDisplayDelta, +[](long id, double dt) {
       glBindFramebuffer(GL_FRAMEBUFFER, frameBufferId);
-      glViewport(0, 0, 1024, 1024);glEnable(GL_CULL_FACE);
+      glViewport(0, 0, 1024, 1024);
+      glEnable(GL_CULL_FACE);
       glCullFace(GL_BACK);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-      glUseProgram(depthShader.id);
+      glUseProgram(shadowShader.id);
       glBindVertexArray(vertexArrayId);
       glBindBuffer(GL_ARRAY_BUFFER, verticiesId);
-      glEnableVertexAttribArray(depthShader.position);
-      glVertexAttribPointer(depthShader.position, 3, GL_FLOAT, GL_FALSE,
+      glEnableVertexAttribArray(shadowShader.position);
+      glVertexAttribPointer(shadowShader.position, 3, GL_FLOAT, GL_FALSE,
         sizeof(vertex), nullptr);
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indiciesId);
       glBindBuffer(GL_ARRAY_BUFFER, instancesId);
       for (auto i = 0; i < 4; i++) {
-        glVertexAttribPointer(depthShader.modelTransform + i,
+        glVertexAttribPointer(shadowShader.modelTransform + i,
           4, GL_FLOAT, GL_FALSE,
           sizeof(instance), (void*)(sizeof(vec4) * i));
-        glEnableVertexAttribArray(depthShader.modelTransform + i);
-        glVertexAttribDivisor(depthShader.modelTransform + i, 1);
+        glEnableVertexAttribArray(shadowShader.modelTransform + i);
+        glVertexAttribDivisor(shadowShader.modelTransform + i, 1);
       }
-      glUniformMatrix4fv(depthShader.worldDepthTransform,
+      glUniformMatrix4fv(shadowShader.worldDepthTransform,
         1, GL_FALSE, value_ptr(worldDepthTransform));
       glDrawElementsInstanced(GL_TRIANGLES, indicies_count, GL_UNSIGNED_INT, nullptr, instances_count);
-      glDisableVertexAttribArray(depthShader.position);
+      glDisableVertexAttribArray(shadowShader.position);
       for (auto i = 0; i < 4; i++)
-        glDisableVertexAttribArray(depthShader.modelTransform + i);
+        glDisableVertexAttribArray(shadowShader.modelTransform + i);
       glBindBuffer(GL_ARRAY_BUFFER, 0);
       glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
       glBindVertexArray(0);
@@ -420,7 +420,7 @@ namespace OpenGL {
       glUniformMatrix4fv(modelShader.depthBiasTransform, 1, GL_FALSE,
         value_ptr(depthBiasTransform));
       glActiveTexture(GL_TEXTURE0);
-      glBindTexture(GL_TEXTURE_2D, depthTextureId);
+      glBindTexture(GL_TEXTURE_2D, shadowTextureId);
       glUniform1i(modelShader.shadowMap, 0);
       glUniform3fv(modelShader.lightDirection, 1, value_ptr(lightDirection));
       glDrawElementsInstanced(GL_TRIANGLES, indicies_count, GL_UNSIGNED_INT, nullptr, instances_count);
@@ -440,7 +440,7 @@ namespace OpenGL {
       // glUseProgram(quadShader.id);
       // glBindVertexArray(quadVertexArrayId);
       // glActiveTexture(GL_TEXTURE0);
-      // glBindTexture(GL_TEXTURE_2D, depthTextureId);
+      // glBindTexture(GL_TEXTURE_2D, shadowTextureId);
       // glUniform1i(quadShader.shadowMap, 0);
       // glEnableVertexAttribArray(quadShader.position);
       // glBindBuffer(GL_ARRAY_BUFFER, quadVerticiesId);
@@ -452,7 +452,7 @@ namespace OpenGL {
       // glUseProgram(0);
     });
 
-    Bus::On(Message::OnQuit, +[](long id, void* m) {
+    Bus::On(Event::OnQuit, +[](long id, void* m) {
       glDeleteBuffers(1, &verticiesId);
       glDeleteVertexArrays(1, &vertexArrayId);
       glDeleteBuffers(1, &quadVerticiesId);
@@ -460,10 +460,10 @@ namespace OpenGL {
       glDeleteBuffers(1, &indiciesId);
       glDeleteBuffers(1, &instancesId);
       glDeleteProgram(modelShader.id);
-      glDeleteProgram(depthShader.id);
+      glDeleteProgram(shadowShader.id);
       glDeleteProgram(quadShader.id);
       glDeleteFramebuffers(1, &frameBufferId);
-      glDeleteTextures(1, &depthTextureId);
+      glDeleteTextures(1, &shadowTextureId);
     });
   }
 }

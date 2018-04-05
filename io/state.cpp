@@ -37,7 +37,7 @@ namespace State {
       // WideCharToMultiByte return 0 for errors.
       string errorMsg = "UTF16 to UTF8 failed with error code: "
         + GetLastError();
-      Bus::Emit(Message::OnError, 0, errorMsg);
+      Bus::Emit(Event::OnError, 0, errorMsg);
       throw runtime_error(errorMsg.c_str());
     }
     return res;
@@ -48,12 +48,12 @@ namespace State {
     szPath[0] = 0;
     if (!SUCCEEDED(SHGetFolderPathW(nullptr, CSIDL_APPDATA, nullptr, 0, szPath)))
     {
-      Bus::Emit(Message::OnError, 0, "Unable to find %APPDATA%");
+      Bus::Emit(Event::OnError, 0, "Unable to find %APPDATA%");
       throw runtime_error("Unable to find %APPDATA%");
     }
     string res = win32_utf16_to_utf8(szPath) + "\\Fantoccini";
     if (!CreateDirectory(res.c_str(), nullptr) && GetLastError() != ERROR_ALREADY_EXISTS)
-      Bus::Emit(Message::OnError, 0, "Unable to create %APPDATA% directory");
+      Bus::Emit(Event::OnError, 0, "Unable to create %APPDATA% directory");
     return res;
   }
 }
@@ -77,12 +77,12 @@ namespace State {
     }
     auto pw = getpwuid(uid);
     if (!pw) {
-      Bus::Emit(Message::OnError, 0, "Unable to get passwd struct");
+      Bus::Emit(Event::OnError, 0, "Unable to get passwd struct");
       throw runtime_error("Unable to get passwd struct");
     }
     auto tempRes = pw->pw_dir;
     if (!tempRes) {
-      Bus::Emit(Message::OnError, 0, "User has no home directory");
+      Bus::Emit(Event::OnError, 0, "User has no home directory");
       throw runtime_error("User has no home directory");
     }
     res = tempRes;
@@ -96,7 +96,7 @@ namespace State {
     if (envHome) {
       if (envHome[0] != '/') {
         string errorMsg = "$" + envName + " does not start with an '/'. XDG specifies that the value must be absolute. The current value is: \"" + envHome + "\"";
-        Bus::Emit(Message::OnError, 0, errorMsg);
+        Bus::Emit(Event::OnError, 0, errorMsg);
         throw runtime_error(errorMsg);
       }
       res = envHome;
@@ -111,7 +111,7 @@ namespace State {
     #endif
     struct stat sb;
     if (stat(res.c_str(), &sb) != 0 && mkdir(res.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) == -1)
-      Bus::Emit(Message::OnError, 0, "Unable to create data directory");
+      Bus::Emit(Event::OnError, 0, "Unable to create data directory");
     return res;
   }
 }

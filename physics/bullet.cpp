@@ -3,7 +3,7 @@
 
 namespace Bullet {
   void Bind() {
-    Bus::On(Message::OnStart, +[](long id, double dt) { });
-    Bus::On(Message::OnPhysicsDelta, +[](long id, double dt) { });
+    Bus::On(Event::OnStart, +[](long id, double dt) { });
+    Bus::On(Event::OnPhysicsDelta, +[](long id, double dt) { });
   }
 }

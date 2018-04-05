@@ -31,6 +31,7 @@
 - [ ] Phyisics
 - [ ] Implement cmake
 - [ ] Audio
+- [ ] Cmake / resource copying etc
 
 ## Camera
 - https://r3dux.org/2012/12/a-c-camera-class-for-simple-opengl-fps-controls/

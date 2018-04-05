@@ -97,12 +97,12 @@ namespace MagicaVoxel {
   map<long, Model*> models;
 
   void Bind() {
-    Bus::On(Message::OnQuit, +[](long id, void* m) {
+    Bus::On(Event::OnQuit, +[](long id, void* m) {
       for (auto& kv : models)
         delete kv.second;
       models.clear();
     });
-    Bus::On(Message::OnEntityDeleted, +[](long id, void* m) {
+    Bus::On(Event::OnEntityDeleted, +[](long id, void* m) {
       if (models.find(id) != models.end()) {
         delete models[id];
         models.erase(id);
@@ -112,21 +112,21 @@ namespace MagicaVoxel {
     Bus::On(Procedure::LoadMagicaVoxel, +[](long id, const char* path) -> void* {
       PhysFS::ifstream file(path);
       if (!file.good()) {
-        Bus::Emit(Message::OnError, id, "Could not open file");
+        Bus::Emit(Event::OnError, id, "Could not open file");
         return nullptr;
       }
 
       unsigned char magic[4];
       file.read((char*)&magic, 4);
       if (!file.good() || memcmp(&magic, "VOX ", 4) != 0) {
-        Bus::Emit(Message::OnError, id, "MagicID not present");
+        Bus::Emit(Event::OnError, id, "MagicID not present");
         return nullptr;
       }
 
       unsigned int version;
       file.read((char*)&version, sizeof(version));
       if (!file.good() || version != VoxFileVersion) {
-        Bus::Emit(Message::OnError, id, "Version mismatch");
+        Bus::Emit(Event::OnError, id, "Version mismatch");
         return nullptr;
       }
 
@@ -134,7 +134,7 @@ namespace MagicaVoxel {
       Header main;
       if (!ReadHeader(file, main) || !file.good()
           || memcmp(&main.id, "MAIN", 4) != 0) {
-        Bus::Emit(Message::OnError, id, "Main header issue");
+        Bus::Emit(Event::OnError, id, "Main header issue");
         return nullptr;
       }
       file.seekg(main.content_size, ios::cur);
@@ -146,7 +146,7 @@ namespace MagicaVoxel {
       while (file.good() && (int)file.tellg() < main.end) {
         Header header;
         if (!ReadHeader(file, header) || !file.good()) {
-          Bus::Emit(Message::OnError, id, "Reading header");
+          Bus::Emit(Event::OnError, id, "Reading header");
           delete model;
           return nullptr;
         }
@@ -172,7 +172,6 @@ namespace MagicaVoxel {
       }
 
       models.insert(pair<long, Model*>(id, model));
-      Bus::Emit(Message::OnMagicaVoxelLoaded, id, model);
       return model;
     });
   }

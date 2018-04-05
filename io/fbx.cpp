@@ -16,18 +16,18 @@ namespace Fbx {
   map<long, FbxScene*> scenes;
 
   void Bind() {
-    Bus::On(Message::OnInit, +[](long id, void* m) {
+    Bus::On(Event::OnInit, +[](long id, void* m) {
       _manager = FbxManager::Create();
       _ios = FbxIOSettings::Create(_manager, IOSROOT);
       _manager->SetIOSettings(_ios);
     });
 
-    Bus::On(Message::OnQuit, +[](long id, void* m) {
+    Bus::On(Event::OnQuit, +[](long id, void* m) {
       for (auto& kv : scenes)
         kv.second->Destroy();
       scenes.clear();
     });
-    Bus::On(Message::OnEntityDeleted, +[](long id, void* m) {
+    Bus::On(Event::OnEntityDeleted, +[](long id, void* m) {
       if (scenes.find(id) != scenes.end()) {
         scenes[id]->Destroy();
         scenes.erase(id);
@@ -40,7 +40,7 @@ namespace Fbx {
       auto importer = FbxImporter::Create(_manager, "");
 
       if (!importer->Initialize(&stream, nullptr, -1, _manager->GetIOSettings())) {
-        Bus::Emit(Message::OnError, id, importer->GetStatus().GetErrorString());
+        Bus::Emit(Event::OnError, id, importer->GetStatus().GetErrorString());
         return nullptr;
       }
 
@@ -50,7 +50,6 @@ namespace Fbx {
       importer = nullptr;
 
       scenes.insert(pair<long, FbxScene*>(id, scene));
-      Bus::Emit(Message::OnFbxLoaded, id, scene);
       return scene;
     });
   }
