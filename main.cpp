@@ -44,7 +44,6 @@ int main(int argc, char* argv[]) {
     // ECS::Delete(fbxid);
   });
 
-  ECS::Bind();
   MagicaVoxel::Bind();
   Fbx::Bind();
   Bullet::Bind();
