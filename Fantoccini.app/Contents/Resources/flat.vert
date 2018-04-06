@@ -1,7 +1,7 @@
 #version 330 core
 
 uniform mat4 worldTransform;
-uniform mat4 depthBiasTransform;
+uniform mat4 shadowBiasTransform;
 in mat4 modelTransform;
 in vec3 position;
 in vec3 normal;
@@ -17,6 +17,6 @@ void main() {
   vertPosition = worldTransform * modelPosition;
   vertNormal = normalize(mat3(inverse(transpose(modelTransform))) * normal);
   vertColor = color;
-  shadowPosition = depthBiasTransform * modelPosition;
+  shadowPosition = shadowBiasTransform * modelPosition;
   gl_Position = vertPosition;
 }

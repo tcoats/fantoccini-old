@@ -53,6 +53,11 @@ int main(int argc, char* argv[]) {
   ECS::Add(lightId, Component::Position, &lightPosition);
   Bus::Emit(Event::OnLight, lightId, nullptr);
 
+  auto shadowId = ECS::NewID();
+  auto shadowProjection = ortho(-10.0f, 10.0f, -10.0f, 10.0f, -10.0f, 20.0f);
+  ECS::Add(shadowId, Component::Projection, &shadowProjection);
+  Bus::Emit(Event::OnShadow, shadowId, nullptr);
+
   Bus::On(Event::OnLoad, +[](long id, void* m) {
     Bus::Emit(Procedure::DisableCursor, 0, nullptr);
   });

@@ -13,23 +13,21 @@ using namespace std;
 using namespace glm;
 
 namespace OpenGL {
-  vec3* cameraPosition;
-  quat* cameraOrientation;
-  mat4* cameraProjection;
+  vec3* cameraPosition = nullptr;
+  quat* cameraOrientation = nullptr;
+  mat4* cameraProjection = nullptr;
   mat4 worldTransform;
 
-  vec3* lightDirection;
-  auto depthProjection = ortho(
-    -10.0f, 10.0f, -10.0f, 10.0f, -10.0f, 20.0f);
-  auto depthBias = mat4(
+  vec3* lightDirection = nullptr;
+  mat4* shadowProjection = nullptr;
+  auto shadowBias = mat4(
     0.5, 0.0, 0.0, 0.0,
     0.0, 0.5, 0.0, 0.0,
     0.0, 0.0, 0.5, 0.0,
     0.5, 0.5, 0.5, 1.0
   );
-  mat4 depthTransform;
-  mat4 worldDepthTransform;
-  mat4 depthBiasTransform;
+  mat4 worldShadowTransform;
+  mat4 shadowBiasTransform;
 
   unsigned int vertexArrayId;
   unsigned int verticiesId;
@@ -44,7 +42,7 @@ namespace OpenGL {
     unsigned int id;
 
     int worldTransform;
-    int depthBiasTransform;
+    int shadowBiasTransform;
     int shadowMap;
     int lightDirection;
     int position;
@@ -57,7 +55,7 @@ namespace OpenGL {
   struct shadowShaderRef {
     unsigned int id;
 
-    int worldDepthTransform;
+    int worldShadowTransform;
     int position;
     int modelTransform;
   };
@@ -223,24 +221,36 @@ namespace OpenGL {
     return result;
   }
 
+  void RecalculateCameraTransform() {
+    worldTransform = (*cameraProjection)
+      * mat4_cast(*cameraOrientation)
+      * translate(mat4(1.0f), *cameraPosition);
+  }
+
+  void RecalculateShadowTransform() {
+    worldShadowTransform = (*shadowProjection) * lookAt(
+      (*lightDirection),
+      vec3(0, 0, 0),
+      vec3(0, 1, 0));
+    shadowBiasTransform = shadowBias * worldShadowTransform;
+  }
+
   void Bind() {
     Bus::On(Event::OnCamera, +[](long id, void* m) {
       cameraPosition = ECS::Get<vec3*>(id, Component::Position);
       cameraOrientation = ECS::Get<quat*>(id, Component::Orientation);
       cameraProjection = ECS::Get<mat4*>(id, Component::Projection);
-      worldTransform = (*cameraProjection)
-        * mat4_cast(*cameraOrientation)
-        * translate(mat4(1.0f), *cameraPosition);
+      RecalculateCameraTransform();
     });
 
     Bus::On(Event::OnLight, +[](long id, void* m) {
       lightDirection = ECS::Get<vec3*>(id, Component::Position);
-      depthTransform = lookAt(
-        (*lightDirection),
-        vec3(0, 0, 0),
-        vec3(0, 1, 0));
-      worldDepthTransform = depthProjection * depthTransform;
-      depthBiasTransform = depthBias * worldDepthTransform;
+      if (shadowProjection != nullptr) RecalculateShadowTransform();
+    });
+
+    Bus::On(Event::OnShadow, +[](long id, void* m) {
+      shadowProjection = ECS::Get<mat4*>(id, Component::Projection);
+      if (lightDirection != nullptr) RecalculateShadowTransform();
     });
 
     Bus::On(Event::OnLoad, +[](long id, void* m) {
@@ -260,8 +270,8 @@ namespace OpenGL {
       cout << "}\n";
 
       shadowShader.id = LoadProgram("shadow");
-      shadowShader.worldDepthTransform =
-        glGetUniformLocation(shadowShader.id, "worldDepthTransform");
+      shadowShader.worldShadowTransform =
+        glGetUniformLocation(shadowShader.id, "worldShadowTransform");
       shadowShader.modelTransform =
         glGetAttribLocation(shadowShader.id, "modelTransform");
       shadowShader.position = glGetAttribLocation(shadowShader.id, "position");
@@ -269,8 +279,8 @@ namespace OpenGL {
       modelShader.id = LoadProgram("flat");
       modelShader.worldTransform =
         glGetUniformLocation(modelShader.id, "worldTransform");
-      modelShader.depthBiasTransform =
-        glGetUniformLocation(modelShader.id, "depthBiasTransform");
+      modelShader.shadowBiasTransform =
+        glGetUniformLocation(modelShader.id, "shadowBiasTransform");
       modelShader.shadowMap =
         glGetUniformLocation(modelShader.id, "shadowMap");
       modelShader.lightDirection =
@@ -289,14 +299,14 @@ namespace OpenGL {
       cout << "{\n";
       cout << "  \"Shadow\": {\n";
       cout << "    \"id\": " << shadowShader.id << ",\n";
-      cout << "    \"worldDepthTransform\": " << shadowShader.worldDepthTransform << ",\n";
+      cout << "    \"worldShadowTransform\": " << shadowShader.worldShadowTransform << ",\n";
       cout << "    \"modelTransform\": " << shadowShader.modelTransform << ",\n";
       cout << "    \"position\": " << shadowShader.position << "\n";
       cout << "  },\n  {\n";
       cout << "  \"Flat\": {\n";
       cout << "    \"id\": " << modelShader.id << ",\n";
       cout << "    \"worldTransform\": " << modelShader.worldTransform << ",\n";
-      cout << "    \"depthBiasTransform\": " << modelShader.depthBiasTransform << ",\n";
+      cout << "    \"shadowBiasTransform\": " << modelShader.shadowBiasTransform << ",\n";
       cout << "    \"shadowMap\": " << modelShader.shadowMap << ",\n";
       cout << "    \"lightDirection\": " << modelShader.lightDirection << ",\n";
       cout << "    \"modelTransform\": " << modelShader.modelTransform << ",\n";
@@ -387,8 +397,8 @@ namespace OpenGL {
         glEnableVertexAttribArray(shadowShader.modelTransform + i);
         glVertexAttribDivisor(shadowShader.modelTransform + i, 1);
       }
-      glUniformMatrix4fv(shadowShader.worldDepthTransform,
-        1, GL_FALSE, value_ptr(worldDepthTransform));
+      glUniformMatrix4fv(shadowShader.worldShadowTransform,
+        1, GL_FALSE, value_ptr(worldShadowTransform));
       glDrawElementsInstanced(GL_TRIANGLES, indicies_count, GL_UNSIGNED_INT, nullptr, instances_count);
       glDisableVertexAttribArray(shadowShader.position);
       for (auto i = 0; i < 4; i++)
@@ -428,8 +438,8 @@ namespace OpenGL {
       glVertexAttribDivisor(modelShader.color, 1);
       glUniformMatrix4fv(modelShader.worldTransform, 1, GL_FALSE,
         value_ptr(worldTransform));
-      glUniformMatrix4fv(modelShader.depthBiasTransform, 1, GL_FALSE,
-        value_ptr(depthBiasTransform));
+      glUniformMatrix4fv(modelShader.shadowBiasTransform, 1, GL_FALSE,
+        value_ptr(shadowBiasTransform));
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, shadowTextureId);
       glUniform1i(modelShader.shadowMap, 0);
