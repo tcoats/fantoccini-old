@@ -13,12 +13,10 @@ using namespace std;
 using namespace glm;
 
 namespace OpenGL {
-  auto cameraPosition = vec3(0.0f, 0.0f, 5.0f);
-  auto cameraOrientation = quat(vec3(0.0f, 1.0f * pi<float>(), 0.0f));
-
-  auto cameraProjection = perspective(45.0f, 16.0f / 9.0f, 0.1f, 100.f);
-  auto cameraTransform = mat4_cast(cameraOrientation) * translate(mat4(1.0f), cameraPosition);
-  auto worldTransform = cameraProjection * cameraTransform;
+  vec3* cameraPosition;
+  quat* cameraOrientation;
+  mat4* cameraProjection;
+  mat4 worldTransform;
 
   auto lightDirection = normalize(vec3(-0.5f, 1.0f, 0.25f));
   auto depthProjection = ortho(
@@ -229,6 +227,15 @@ namespace OpenGL {
   }
 
   void Bind() {
+    Bus::On(Event::OnCamera, +[](long id, void* m) {
+      cameraPosition = ECS::Get<vec3*>(id, Component::Position);
+      cameraOrientation = ECS::Get<quat*>(id, Component::Orientation);
+      cameraProjection = ECS::Get<mat4*>(id, Component::Projection);
+      worldTransform = (*cameraProjection)
+        * mat4_cast(*cameraOrientation)
+        * translate(mat4(1.0f), *cameraPosition);
+    });
+
     Bus::On(Event::OnLoad, +[](long id, void* m) {
       glEnable(GL_DEPTH_TEST);
       glDepthFunc(GL_LESS);
@@ -350,9 +357,6 @@ namespace OpenGL {
       glBindBuffer(GL_ARRAY_BUFFER, instancesId);
       glBufferData(GL_ARRAY_BUFFER, sizeof(instances), nullptr, GL_STREAM_DRAW);
       glBufferData(GL_ARRAY_BUFFER, sizeof(instances), instances, GL_STREAM_DRAW);
-
-      // cameraTransform = mat4_cast((float)(dt * 5.0f) * angleAxis(radians(90.f), normalize(vec3(0.0f, 1.0f, 1.0f)))) * cameraTransform;
-      // worldTransform = cameraProjection * cameraTransform;
     });
 
     Bus::On(Event::OnDisplayDelta, +[](long id, double dt) {

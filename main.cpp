@@ -3,8 +3,12 @@
 #include "io/fbx.h"
 
 #include <iostream>
+#include <ctime>
+#include <iomanip>
 #include <vector>
 #include <string>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 using namespace std;
 using namespace glm;
@@ -14,7 +18,6 @@ namespace MagicaVoxel { void Bind(); }
 namespace Bullet { void Bind(); }
 namespace GLFW { void Bind(); }
 namespace PhysFS { void Bind(); }
-namespace State { void Bind(); }
 namespace OpenGL {
   void Bind();
   namespace Checks { void Bind(); }
@@ -26,36 +29,32 @@ int main(int argc, char* argv[]) {
     cout << message << "\n";
   });
 
-  Bus::On(Event::OnLoad, +[](long id, void* m) {
-    Bus::Emit(Procedure::DisableCursor, 0, nullptr);
-
-    // const time_t t = time(0);
-    // long voxelid = ECS::NewID();
-    // MagicaVoxel::Model* model = (MagicaVoxel::Model*)Bus::Emit(
-    //   Procedure::LoadMagicaVoxel, voxelid, "outcrop.vox");
-    // cout << put_time(gmtime(&t), "%FT%TZ") << " MagicaVoxel Size:"
-    //   << model->voxels.size() << "\n";
-    // ECS::Delete(voxelid);
-
-    // long fbxid = ECS::NewID();
-    // FbxScene* scene = (FbxScene*)Bus::Emit(Procedure::LoadFbx, fbxid, "tower.fbx");
-    // cout << put_time(gmtime(&t), "%FT%TZ") << " Fbx "
-    //   << "HELLO" << "\n";
-    // ECS::Delete(fbxid);
-  });
-
   MagicaVoxel::Bind();
   Fbx::Bind();
   Bullet::Bind();
   GLFW::Bind();
   PhysFS::Bind();
-  State::Bind();
   OpenGL::Bind();
   OpenGL::Checks::Bind();
   OpenGL::Shadow::Bind();
 
+  auto cameraId = ECS::NewID();
+  auto cameraPosition = vec3(0.0f, 0.0f, 5.0f);
+  auto cameraOrientation = quat(vec3(0.0f, 1.0f * pi<float>(), 0.0f));
+  auto cameraProjection = perspective(45.0f, 16.0f / 9.0f, 0.1f, 100.f);
+  ECS::Add(cameraId, Component::Position, &cameraPosition);
+  ECS::Add(cameraId, Component::Orientation, &cameraOrientation);
+  ECS::Add(cameraId, Component::Projection, &cameraProjection);
+  Bus::Emit(Event::OnCamera, cameraId, nullptr);
+
+  Bus::On(Event::OnLoad, +[](long id, void* m) {
+    Bus::Emit(Procedure::DisableCursor, 0, nullptr);
+  });
+
   vector<string> arguments(argv, argv + argc);
   Bus::Emit(Procedure::Init, 0, &arguments);
+
+  ECS::Delete(cameraId);
 
   return 0;
 }

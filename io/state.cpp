@@ -5,11 +5,6 @@
 #include <stdexcept>
 #include <cstdlib>
 
-namespace State {
-  void Bind() {
-  }
-}
-
 using namespace std;
 
 #if defined(_WIN32)
