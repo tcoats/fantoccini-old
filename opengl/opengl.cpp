@@ -18,21 +18,18 @@ namespace OpenGL {
   mat4* cameraProjection;
   mat4 worldTransform;
 
-  auto lightDirection = normalize(vec3(-0.5f, 1.0f, 0.25f));
+  vec3* lightDirection;
   auto depthProjection = ortho(
     -10.0f, 10.0f, -10.0f, 10.0f, -10.0f, 20.0f);
-  auto depthTransform = lookAt(
-    lightDirection,
-    vec3(0, 0, 0),
-    vec3(0, 1, 0));
   auto depthBias = mat4(
     0.5, 0.0, 0.0, 0.0,
     0.0, 0.5, 0.0, 0.0,
     0.0, 0.0, 0.5, 0.0,
     0.5, 0.5, 0.5, 1.0
   );
-  auto worldDepthTransform = depthProjection * depthTransform;
-  auto depthBiasTransform = depthBias * worldDepthTransform;
+  mat4 depthTransform;
+  mat4 worldDepthTransform;
+  mat4 depthBiasTransform;
 
   unsigned int vertexArrayId;
   unsigned int verticiesId;
@@ -236,6 +233,16 @@ namespace OpenGL {
         * translate(mat4(1.0f), *cameraPosition);
     });
 
+    Bus::On(Event::OnLight, +[](long id, void* m) {
+      lightDirection = ECS::Get<vec3*>(id, Component::Position);
+      depthTransform = lookAt(
+        (*lightDirection),
+        vec3(0, 0, 0),
+        vec3(0, 1, 0));
+      worldDepthTransform = depthProjection * depthTransform;
+      depthBiasTransform = depthBias * worldDepthTransform;
+    });
+
     Bus::On(Event::OnLoad, +[](long id, void* m) {
       glEnable(GL_DEPTH_TEST);
       glDepthFunc(GL_LESS);
@@ -426,7 +433,7 @@ namespace OpenGL {
       glActiveTexture(GL_TEXTURE0);
       glBindTexture(GL_TEXTURE_2D, shadowTextureId);
       glUniform1i(modelShader.shadowMap, 0);
-      glUniform3fv(modelShader.lightDirection, 1, value_ptr(lightDirection));
+      glUniform3fv(modelShader.lightDirection, 1, value_ptr(*lightDirection));
       glDrawElementsInstanced(GL_TRIANGLES, indicies_count, GL_UNSIGNED_INT, nullptr, instances_count);
       glDisableVertexAttribArray(modelShader.position);
       glDisableVertexAttribArray(modelShader.normal);

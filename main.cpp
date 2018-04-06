@@ -37,6 +37,7 @@ int main(int argc, char* argv[]) {
   OpenGL::Bind();
   OpenGL::Checks::Bind();
   OpenGL::Shadow::Bind();
+  ECS::Bind();
 
   auto cameraId = ECS::NewID();
   auto cameraPosition = vec3(0.0f, 0.0f, 5.0f);
@@ -47,14 +48,18 @@ int main(int argc, char* argv[]) {
   ECS::Add(cameraId, Component::Projection, &cameraProjection);
   Bus::Emit(Event::OnCamera, cameraId, nullptr);
 
+  auto lightId = ECS::NewID();
+  auto lightPosition = normalize(vec3(-0.5f, 1.0f, 0.25f));
+  ECS::Add(lightId, Component::Position, &lightPosition);
+  Bus::Emit(Event::OnLight, lightId, nullptr);
+
   Bus::On(Event::OnLoad, +[](long id, void* m) {
     Bus::Emit(Procedure::DisableCursor, 0, nullptr);
   });
 
   vector<string> arguments(argv, argv + argc);
   Bus::Emit(Procedure::Init, 0, &arguments);
-
-  ECS::Delete(cameraId);
+  Bus::Emit(Procedure::Purge, 0, nullptr);
 
   return 0;
 }
